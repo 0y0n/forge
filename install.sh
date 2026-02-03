@@ -31,7 +31,7 @@ info "Checking OS …"
 source /etc/os-release
 [[ "${ID:-}" == "$EXPECTED_OS_ID" ]]             || abort "Expected Ubuntu, got '${ID:-unknown}'"
 [[ "${VERSION_ID:-}" == "$EXPECTED_VERSION_ID" ]] || abort "Expected ${EXPECTED_VERSION_ID}, got '${VERSION_ID:-unknown}'"
-# Ensure we are NOT running a desktop flavour (gnome-shell / xfce4-session absent at this stage is fine)
+# Ensure we are NOT running a desktop flavour
 if dpkg -s ubuntu-desktop >/dev/null 2>&1; then
   abort "This installer targets Ubuntu Server, not a desktop edition."
 fi
@@ -54,6 +54,7 @@ fi
 # ── 3. Update & upgrade ─────────────────────────────────────────────────────
 info "Updating package index …"
 apt-get update -qq
+
 info "Upgrading installed packages …"
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
 
@@ -63,8 +64,10 @@ apt-get install -y -qq git
 
 # ── 5. Clone Forge repository ────────────────────────────────────────────────
 if [[ -d "$REPO_DIR/.git" ]]; then
-  info "Repo already exists at ${REPO_DIR}, pulling latest …"
-  git -C "$REPO_DIR" pull --ff-only
+  info "Repo already exists at ${REPO_DIR}, fetching latest …"
+  # Discard any local changes and force update to match remote
+  git -C "$REPO_DIR" fetch origin
+  git -C "$REPO_DIR" reset --hard origin/main
 else
   info "Cloning repo → ${REPO_DIR}"
   git clone --depth 1 "$REPO_URL" "$REPO_DIR"
@@ -73,29 +76,34 @@ fi
 # ── 6. Install Ansible ──────────────────────────────────────────────────────
 info "Installing Ansible …"
 if ! command -v ansible-playbook &>/dev/null; then
-  # Use pipx for an isolated, stable ansible install (no PPA race conditions)
-  apt-get install -y -qq pipx python3-pip
-  pipx ensurepath
-  # shellcheck source=/dev/null
-  [[ -f "${HOME}/.local/bin/pipx" ]] && export PATH="${HOME}/.local/bin:${PATH}"
-  pipx install ansible
-  # Make it available system-wide for root
-  ANSIBLE_BIN=$(pipx show ansible 2>/dev/null | grep Location | awk '{print $2}')
-  ln -sf "${ANSIBLE_BIN}/bin/ansible-playbook" /usr/local/bin/ansible-playbook
-  ln -sf "${ANSIBLE_BIN}/bin/ansible"          /usr/local/bin/ansible
+  # Install pipx (lightweight, isolated Python app installer)
+  apt-get install -y -qq pipx
+  
+  # Install ansible via pipx (creates isolated venv automatically)
+  export PIPX_HOME=/opt/pipx
+  export PIPX_BIN_DIR=/usr/local/bin
+  pipx install --include-deps ansible
+  
+  # Verify installation succeeded
+  if ! command -v ansible-playbook &>/dev/null; then
+    abort "Ansible installation failed. ansible-playbook not found in PATH."
+  fi
 fi
-ansible --version | head -1
+
+info "Ansible version: $(ansible --version | head -1)"
 
 # ── 7. Launch the playbook ──────────────────────────────────────────────────
 info "Starting Ansible playbook for remote-workstation …"
 cd "$REPO_DIR"
 
-ansible-playbook \
+if ! ansible-playbook \
   -i inventory/hosts.yml \
   playbooks/remote_workstation.yml \
-  --connection local \
+  --connection=local \
   -e "ansible_become=yes" \
-  -v
+  -v; then
+  abort "Ansible playbook failed. Check the output above for errors."
+fi
 
 info "═══════════════════════════════════════════════════"
 info " Forge bootstrap for remote-workstation complete.  "
