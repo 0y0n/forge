@@ -1,0 +1,5 @@
+---
+- name: restart litellm
+  ansible.builtin.systemd:
+    name:  litellm
+    state: restarted

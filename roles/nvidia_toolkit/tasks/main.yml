@@ -1,0 +1,48 @@
+# =============================================================================
+# roles/nvidia_toolkit/tasks/main.yml
+# Installs NVIDIA CUDA Toolkit (server edition) inside a VM.
+# Uses the official NVIDIA apt repo pinned to the host Ubuntu version.
+# =============================================================================
+---
+- name: "nvidia_toolkit | install required libs"
+  ansible.builtin.apt:
+    name:
+      - wget
+      - gnupg
+      - curl
+    state: present
+
+- name: "nvidia_toolkit | add NVIDIA GPG key"
+  ansible.builtin.shell: >
+    wget -qO - https://developer.ubuntu.com/key/nvidia.asc |
+    gpg --dearmor -o /usr/share/keyrings/nvidia-developer.gpg
+  args:
+    creates: /usr/share/keyrings/nvidia-developer.gpg
+
+- name: "nvidia_toolkit | add NVIDIA apt repo"
+  ansible.builtin.apt_repository:
+    repo: >
+      deb [signed-by=/usr/share/keyrings/nvidia-developer.gpg]
+      https://developer.download.nvidia.com/cuda/ubuntu2404/x86_64
+      /
+      main
+    state: present
+    filename: nvidia-developer
+
+- name: "nvidia_toolkit | install CUDA toolkit"
+  ansible.builtin.apt:
+    name:
+      - cuda-toolkit-12-3
+      - nvidia-container-toolkit
+    state: present
+    update_cache: true
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: "nvidia_toolkit | add CUDA to PATH (profile.d)"
+  ansible.builtin.copy:
+    dest: /etc/profile.d/cuda.sh
+    content: |
+      export PATH=/usr/local/cuda/bin:$PATH
+      export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+    mode: "0644"

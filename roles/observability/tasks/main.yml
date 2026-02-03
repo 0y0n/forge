@@ -1,0 +1,99 @@
+# =============================================================================
+# roles/observability/tasks/main.yml
+# Prometheus  •  Grafana  •  Loki  — all as podman containers.
+# =============================================================================
+---
+# ── Prometheus ───────────────────────────────────────────────────────────────
+- name: "observability | create Prometheus config dir"
+  ansible.builtin.file:
+    path:  /etc/prometheus
+    state: directory
+    mode:  "0755"
+
+- name: "observability | deploy Prometheus config"
+  ansible.builtin.template:
+    src:  prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    mode: "0644"
+
+- name: "observability | pull Prometheus image"
+  ansible.builtin.command: >
+    podman pull docker.io/prom/prometheus:latest
+
+- name: "observability | run Prometheus"
+  ansible.builtin.command: >
+    podman run -d
+      --name prometheus
+      -p {{ prometheus_port }}:9090
+      -v /etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      -v /srv/prometheus/data:/prometheus
+      docker.io/prom/prometheus:latest
+        --config.file=/etc/prometheus/prometheus.yml
+        --storage.tsdb.path=/prometheus
+  args:
+    creates: /srv/prometheus/.running
+  register: prom_run
+
+- name: "observability | mark prometheus running"
+  ansible.builtin.file:
+    path:  /srv/prometheus/.running
+    state: touch
+  when: prom_run.changed | default(false)
+
+# ── Grafana ──────────────────────────────────────────────────────────────────
+- name: "observability | pull Grafana image"
+  ansible.builtin.command: >
+    podman pull docker.io/grafana/grafana:latest
+
+- name: "observability | run Grafana"
+  ansible.builtin.command: >
+    podman run -d
+      --name grafana
+      -p {{ grafana_port }}:3000
+      -v /srv/grafana/data:/var/lib/grafana
+      docker.io/grafana/grafana:latest
+  args:
+    creates: /srv/grafana/.running
+  register: grafana_run
+
+- name: "observability | mark grafana running"
+  ansible.builtin.file:
+    path:  /srv/grafana/.running
+    state: touch
+  when: grafana_run.changed | default(false)
+
+# ── Loki ─────────────────────────────────────────────────────────────────────
+- name: "observability | create Loki config dir"
+  ansible.builtin.file:
+    path:  /etc/loki
+    state: directory
+    mode:  "0755"
+
+- name: "observability | deploy Loki config"
+  ansible.builtin.template:
+    src:  loki-config.yml.j2
+    dest: /etc/loki/loki-config.yml
+    mode: "0644"
+
+- name: "observability | pull Loki image"
+  ansible.builtin.command: >
+    podman pull docker.io/grafana/loki:latest
+
+- name: "observability | run Loki"
+  ansible.builtin.command: >
+    podman run -d
+      --name loki
+      -p {{ loki_port }}:3100
+      -v /etc/loki:/etc/loki
+      -v /srv/loki/data:/tmp/loki
+      docker.io/grafana/loki:latest
+        -config.file=/etc/loki/loki-config.yml
+  args:
+    creates: /srv/loki/.running
+  register: loki_run
+
+- name: "observability | mark loki running"
+  ansible.builtin.file:
+    path:  /srv/loki/.running
+    state: touch
+  when: loki_run.changed | default(false)

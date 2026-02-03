@@ -1,0 +1,48 @@
+# =============================================================================
+# roles/docs_tools/tasks/main.yml
+# Documentation-as-code stack:
+#   • Sphinx + sphinx-needs
+#   • PlantUML (requires Java)
+#   • Python4Capella (Polarsable / Capella scripting bridge)
+# =============================================================================
+---
+- name: "docs_tools | install base deps"
+  ansible.builtin.apt:
+    name:
+      - python3-pip
+      - default-jre        # PlantUML needs Java
+      - graphviz           # Sphinx dot rendering
+    state: present
+
+# ── Sphinx ───────────────────────────────────────────────────────────────────
+- name: "docs_tools | install Sphinx + sphinx-needs via pip"
+  ansible.builtin.pip:
+    name:
+      - sphinx
+      - sphinx-needs
+      - sphinx-rtd-theme
+    executable: pip3
+
+# ── PlantUML ─────────────────────────────────────────────────────────────────
+- name: "docs_tools | download PlantUML jar"
+  ansible.builtin.get_url:
+    url:  "https://sourceforge.net/projects/plantuml/files/plantuml/1.2024.7/plantuml-1.2024.7.jar"
+    dest: /opt/plantuml.jar
+    mode: "0644"
+
+- name: "docs_tools | create plantuml wrapper script"
+  ansible.builtin.copy:
+    dest:  /usr/local/bin/plantuml
+    mode:  "0755"
+    content: |
+      #!/bin/bash
+      java -jar /opt/plantuml.jar "$@"
+
+# ── Python4Capella ───────────────────────────────────────────────────────────
+- name: "docs_tools | install Python4Capella via pip"
+  ansible.builtin.pip:
+    name:
+      - python4capella
+    executable: pip3
+  # If the package name differs on PyPI, adjust here.
+  ignore_errors: true    # best-effort; may need manual Capella setup later

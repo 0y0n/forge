@@ -1,0 +1,60 @@
+# =============================================================================
+# remote_workstation.yml
+# Entry-point playbook.  Run with:
+#   ansible-playbook -i inventory/hosts.yml playbooks/remote_workstation.yml --connection local
+#
+# Flow:
+#   1. Base (OS guard already done by install.sh, but idempotent check kept)
+#   2. Minimal XFCE desktop + Chrome
+#   3. NVIDIA host driver
+#   4. IDEs  (VSCode + JetBrains CE)
+#   5. KVM + provision both guest VMs (cloud-init + wait-for-SSH)
+#   6. Run dev_workstation playbook against the new guest
+#   7. Run forge_infra  playbook against the new guest
+# =============================================================================
+
+- name: "Forge — remote-workstation (physical host)"
+  hosts: remote-workstation
+  connection: local
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: base          # idempotent OS / update / git
+    - role: desktop       # xfce4-minimal + chrome
+    - role: nvidia_host   # NVIDIA driver (host, not container)
+    - role: ide           # VSCode + JetBrains Community
+    - role: kvm           # qemu-kvm, SSH keypair, both VM definitions
+
+# ── second play: delegate into dev-workstation guest ─────────────────────────
+- name: "Forge — dev-workstation (KVM guest)"
+  hosts: dev-workstation
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: base
+    - role: nvidia_toolkit    # CUDA toolkit inside the guest
+    - role: bazel
+    - role: dev_tools         # java / python / rust + linting / formatting
+    - role: opencode          # opencode CLI
+    - role: docs_tools        # sphinx, sphinx-needs, plantuml, capella/Python4Capella
+    - role: security_scanning # semgrep, trivy, gitleaks
+
+# ── third play: delegate into forge-infra guest ─────────────────────────────
+- name: "Forge — forge-infra (KVM guest)"
+  hosts: forge-infra
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: base
+    - role: vault              # HashiCorp Vault
+    - role: network_policy     # Traefik + Cilium
+    - role: databases          # PostgreSQL, SeaweedFS, DVC
+    - role: containers         # podman, podman-compose, packer, syft
+    - role: orchestration      # k3s, helm, local-path-provisioner, workload CRs
+    - role: devops_stack       # GitLab, Artifactory, SonarQube
+    - role: nvidia_toolkit     # CUDA toolkit (for AI workloads)
+    - role: ai_stack           # ollama, qdrant, searxng, liteLLM, redis
+    - role: observability      # Prometheus, Grafana, Loki

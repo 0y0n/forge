@@ -1,0 +1,10 @@
+[Unit]
+Description=SeaweedFS Master
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/weed master -metas={{ seaweedfs_data_dir }}/master -port={{ seaweedfs_master_port }}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

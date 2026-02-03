@@ -1,0 +1,58 @@
+# =============================================================================
+# roles/network_policy/tasks/main.yml
+# Traefik (reverse proxy / ingress) + Cilium (CNI / network policy).
+# Both run as systemd services in the prototype; in production they move into k8s.
+# =============================================================================
+---
+# ── Traefik ──────────────────────────────────────────────────────────────────
+- name: "network_policy | download Traefik binary"
+  ansible.builtin.get_url:
+    url:  "https://github.com/traefik/traefik/releases/download/{{ traefik_version }}/traefik_{{ traefik_version }}_linux_amd64.zip"
+    dest: /tmp/traefik.zip
+    mode: "0644"
+
+- name: "network_policy | unpack Traefik"
+  ansible.builtin.unarchive:
+    src:        /tmp/traefik.zip
+    dest:       /usr/local/bin
+    remote_src: true
+    mode:       "0755"
+
+- name: "network_policy | create Traefik config dir"
+  ansible.builtin.file:
+    path:  /etc/traefik
+    state: directory
+    mode:  "0755"
+
+- name: "network_policy | deploy Traefik static config"
+  ansible.builtin.template:
+    src:  traefik.yml.j2
+    dest: /etc/traefik/traefik.yml
+    mode: "0644"
+  notify: restart traefik
+
+- name: "network_policy | deploy Traefik systemd unit"
+  ansible.builtin.template:
+    src:  traefik.service.j2
+    dest: /etc/systemd/system/traefik.service
+    mode: "0644"
+  notify: restart traefik
+
+- name: "network_policy | enable & start Traefik"
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name:    traefik
+    enabled: true
+    state:   started
+
+# ── Cilium ───────────────────────────────────────────────────────────────────
+# In the prototype Cilium is installed via the Cilium CLI and attached to k3s.
+# This task installs the CLI; the actual CNI wiring is done by the orchestration role.
+- name: "network_policy | install Cilium CLI"
+  ansible.builtin.shell: >
+    CILIUM_CLI_VERSION=$(curl -s -L -o /dev/null -w "%{url_effective}" https://github.com/cilium/cilium-cli/releases/latest | grep -oE "[^/]+$") &&
+    curl -L -o /usr/local/bin/cilium https://github.com/cilium/cilium-cli/releases/${CILIUM_CLI_VERSION}/download/cilium-linux-amd64 &&
+    chmod +x /usr/local/bin/cilium
+  args:
+    executable: /bin/bash
+    creates: /usr/local/bin/cilium

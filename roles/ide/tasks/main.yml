@@ -1,0 +1,87 @@
+# =============================================================================
+# roles/ide/tasks/main.yml
+# Visual Studio Code  (desktop .deb)  + JetBrains Community Editions.
+# Extensions are installed via the `code` CLI in a post-install task.
+# =============================================================================
+---
+# ── Visual Studio Code ───────────────────────────────────────────────────────
+- name: "ide | add Microsoft GPG key"
+  ansible.builtin.shell: >
+    wget -qO - https://packages.microsoft.com/keys/microsoft.asc |
+    gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+  args:
+    creates: /usr/share/keyrings/microsoft.gpg
+
+- name: "ide | add VS Code apt repo"
+  ansible.builtin.apt_repository:
+    repo: >
+      deb [signed-by=/usr/share/keyrings/microsoft.gpg arch=amd64]
+      https://packages.microsoft.com/vscode stable main
+    state: present
+    filename: vscode
+
+- name: "ide | install VS Code"
+  ansible.builtin.apt:
+    name: code
+    state: present
+    update_cache: true
+
+# ── VS Code extensions ───────────────────────────────────────────────────────
+- name: "ide | install VS Code extensions"
+  ansible.builtin.command: >
+    code --install-extension {{ item }} --user
+  loop:
+    - rust-lang.rust-analyzer
+    - ms-python.python
+    - ms-python.pylance
+    - vscjava.vscode-java-pack
+    - ms-vscode.remote-ssh
+    - ms-vscode-remote.vscode-remote-extensionpack
+    - calaumai.continue
+    - anysphere.cursor          # OpenCode / Cursor extension
+    - bazelbuild.bazel-vs-code
+  environment:
+    HOME: "{{ ansible_env.HOME }}"
+  # code CLI may fail for first run if no display; best-effort, not fatal
+  ignore_errors: true    # extensions install at next real launch anyway
+
+# ── JetBrains Community Editions ─────────────────────────────────────────────
+- name: "ide | download & install IntelliJ IDEA Community"
+  ansible.builtin.unarchive:
+    src:  "https://download.jetbrains.com/idea/ideac-2024.1.tar.gz"
+    dest: /opt
+    remote_src: true
+    creates: /opt/idea-community-2024.1
+
+- name: "ide | symlink idea"
+  ansible.builtin.file:
+    path:  /usr/local/bin/idea
+    src:   /opt/idea-community-2024.1/bin/idea.sh
+    state: link
+
+- name: "ide | download & install PyCharm Community"
+  ansible.builtin.unarchive:
+    src:  "https://download.jetbrains.com/python/pycharm-community-2024.1.tar.gz"
+    dest: /opt
+    remote_src: true
+    creates: /opt/pycharm-community-2024.1
+
+- name: "ide | symlink pycharm"
+  ansible.builtin.file:
+    path:  /usr/local/bin/pycharm
+    src:   /opt/pycharm-community-2024.1/bin/pycharm.sh
+    state: link
+
+- name: "ide | download & install RubyMine … (Rust = RustRover Community)"
+  # RustRover is free community edition since 2024
+  ansible.builtin.unarchive:
+    src:  "https://download.jetbrains.com/rustrover/RustRover-2024.1.tar.gz"
+    dest: /opt
+    remote_src: true
+    creates: /opt/RustRover-2024.1
+
+- name: "ide | symlink rustrover"
+  ansible.builtin.file:
+    path:  /usr/local/bin/rustrover
+    src:   /opt/RustRover-2024.1/bin/rustrover.sh
+    state: link

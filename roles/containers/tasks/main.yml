@@ -1,0 +1,55 @@
+# =============================================================================
+# roles/containers/tasks/main.yml
+# Podman ecosystem + image-scanning (Syft) + image-baking (Packer).
+# =============================================================================
+---
+- name: "containers | install podman + podman-compose"
+  ansible.builtin.apt:
+    name:
+      - podman
+      - podman-compose        # may need pip fallback; see below
+    state: present
+    update_cache: true
+  ignore_errors: true          # podman-compose not always in apt
+
+- name: "containers | install podman-compose via pip (fallback)"
+  ansible.builtin.pip:
+    name:       podman-compose
+    executable: pip3
+
+- name: "containers | enable & start podman"
+  ansible.builtin.systemd:
+    name:    podman
+    enabled: true
+    state:   started
+
+# ── Packer ───────────────────────────────────────────────────────────────────
+- name: "containers | add HashiCorp GPG key (if not present)"
+  ansible.builtin.shell: >
+    wget -qO - https://apt.releases.hashicorp.com/gpg |
+    gpg --dearmor -o /usr/share/keyrings/hashicorp.gpg
+  args:
+    creates: /usr/share/keyrings/hashicorp.gpg
+
+- name: "containers | add HashiCorp apt repo (if not present)"
+  ansible.builtin.apt_repository:
+    repo: >
+      deb [signed-by=/usr/share/keyrings/hashicorp.gpg]
+      https://apt.releases.hashicorp.com
+      {{ ansible_distribution_release }} main
+    state:    present
+    filename: hashicorp
+
+- name: "containers | install packer"
+  ansible.builtin.apt:
+    name:         packer
+    state:        present
+    update_cache: true
+
+# ── Syft ─────────────────────────────────────────────────────────────────────
+- name: "containers | install Syft (container SBOM)"
+  ansible.builtin.shell: >
+    curl -sSfL https://anchor.dev/cli/install | sh -s -- install syft
+  args:
+    executable: /bin/bash
+    creates: /usr/local/bin/syft

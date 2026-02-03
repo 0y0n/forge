@@ -1,0 +1,9 @@
+---
+- name: restart seaweedfs
+  ansible.builtin.systemd:
+    name:  "seaweedfs_{{ item }}"
+    state: restarted
+  loop:
+    - master
+    - volume
+    - filer

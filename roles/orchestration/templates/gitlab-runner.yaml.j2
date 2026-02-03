@@ -1,0 +1,46 @@
+# =============================================================================
+# gitlab-runner.yaml.j2
+# Kubernetes Deployment for the GitLab Runner pod.
+# Image is a placeholder; build via Packer + the dev_tools role recipe.
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: forge
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name:      gitlab-runner
+  namespace: forge
+  labels:
+    app: gitlab-runner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab-runner
+  template:
+    metadata:
+      labels:
+        app: gitlab-runner
+    spec:
+      containers:
+        - name:  runner
+          # TODO: replace with a Packer-baked image that has bazel + dev_tools
+          image:   ubuntu:24.04
+          command: ["sleep", "infinity"]
+          resources:
+            requests:
+              cpu:    500m
+              memory: 2Gi
+            limits:
+              cpu:    "{{ k3s_runners[0].vcpus }}"
+              memory: "{{ k3s_runners[0].memory }}"
+          volumeMounts:
+            - name:      cache
+              mountPath: /cache
+      volumes:
+        - name: cache
+          emptyDir: {}

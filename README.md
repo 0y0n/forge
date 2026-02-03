@@ -1,6 +1,249 @@
-# ubuntu-server-forge-workstation-install
-This repository contains small recipes (sh scripts then ansible work books) to setup my environement
+# Forge — Ubuntu Server Workstation Installer
 
-```console
-curl -fsSL https://github.com/0y0n/ubuntu-server-forge-workstation-install/install.sh | bash
+> **One-liner. Full dev-platform. Air-gap ready.**
+>
+> Forge bootstraps a complete, enterprise-grade development environment on a
+> single physical workstation: a minimal remote-IDE host, a local
+> developer VM, and a full DevOps + AI infrastructure VM — all fully
+> automated, hermetic, and everything-as-code.
+
+---
+
+## Quick start
+
+```bash
+curl -fsSL https://github.com/0y0n/forge/raw/main/install.sh | bash
 ```
+
+That is it.  The script validates the OS, clones this repo, installs Ansible,
+and runs the playbook.  No manual steps required.
+
+> **Prerequisite:** a fresh **Ubuntu Server 24.04 LTS** install on bare metal
+> or a VM with at least the specs listed in [Hardware](#hardware).
+
+---
+
+## What Forge provisions
+
+```
+remote-workstation          (physical host — this machine)
+│
+├── XFCE4 desktop + Chrome
+├── NVIDIA host driver
+├── VS Code + JetBrains Community (IntelliJ / PyCharm / RustRover)
+│
+└── KVM / QEMU
+    ├── dev-workstation     (guest VM)
+    │   ├── CUDA Toolkit
+    │   ├── Bazel
+    │   ├── Java / Python / Rust toolchains + linters / formatters
+    │   ├── OpenCode CLI
+    │   ├── Sphinx + sphinx-needs / PlantUML / Python4Capella
+    │   └── Semgrep / Trivy / Gitleaks
+    │
+    └── forge-infra         (guest VM)
+        ├── Security        Vault
+        ├── Network         Traefik · Cilium
+        ├── Storage         PostgreSQL · SeaweedFS · DVC
+        ├── DevOps          GitLab CE · Artifactory OSS · SonarQube
+        ├── AI              Ollama · Qdrant · SearXNG · LiteLLM · Redis
+        ├── Observability   Prometheus · Grafana · Loki
+        ├── Containers      Podman · podman-compose · Packer · Syft
+        └── Orchestration   k3s · Helm · local-path-provisioner
+                            └── gitlab-runner
+                            └── buildbody-cache   (Bazel remote cache)
+                            └── buildbody-executor (Bazel remote exec)
+```
+
+---
+
+## Hardware
+
+The reference prototype runs on:
+
+| Component | Spec |
+|-----------|------|
+| CPU | Intel i7-13700K |
+| RAM | 64 GB |
+| GPU | NVIDIA RTX 4070 12 GB VRAM |
+| Storage | Samsung 990 Pro NVMe |
+
+Default VM allocation leaves ~16 GB and all physical cores available to the
+host at idle.  Adjust `vm_dev_workstation` / `vm_forge_infra` in
+`inventory/group_vars/remote_workstation.yml`.
+
+---
+
+## Repository layout
+
+```
+.
+├── install.sh                          # bootstrap (curl | bash entry-point)
+├── ansible.cfg                         # paths, callbacks, fact cache
+│
+├── inventory/
+│   ├── hosts.yml                       # 3-host static inventory
+│   └── group_vars/
+│       ├── all.yml                     # version pins & shared paths
+│       ├── remote_workstation.yml      # VM specs, NVIDIA branch
+│       ├── dev_workstation.yml         # Bazel remote endpoints
+│       └── forge_infra.yml             # service ports, DB list, k3s pods
+│
+├── playbooks/
+│   └── remote_workstation.yml          # single entry-point: 3 plays in sequence
+│
+└── roles/                              # 18 self-contained roles
+    ├── base/                           # OS check · apt update/upgrade · git
+    ├── desktop/                        # XFCE4 (minimal) + Chrome
+    ├── nvidia_host/                    # NVIDIA driver on physical host
+    ├── nvidia_toolkit/                 # CUDA Toolkit inside VMs
+    ├── ide/                            # VS Code + JetBrains Community
+    ├── kvm/                            # QEMU/KVM + cloud-init VM provisioning
+    ├── dev_tools/                      # language toolchains + linters
+    ├── bazel/                          # Bazel build system
+    ├── opencode/                       # OpenCode CLI
+    ├── docs_tools/                     # Sphinx / PlantUML / Capella
+    ├── security_scanning/              # Semgrep / Trivy / Gitleaks
+    ├── vault/                          # HashiCorp Vault OSS
+    ├── network_policy/                 # Traefik reverse-proxy + Cilium CLI
+    ├── databases/                      # PostgreSQL · SeaweedFS · DVC
+    ├── devops_stack/                   # GitLab · Artifactory · SonarQube
+    ├── ai_stack/                       # Ollama · Qdrant · SearXNG · LiteLLM · Redis
+    ├── observability/                  # Prometheus · Grafana · Loki
+    ├── containers/                     # Podman · Packer · Syft
+    └── orchestration/                  # k3s · Helm · workload manifests
+```
+
+---
+
+## How it works
+
+### 1. `install.sh` — bootstrap
+
+| Step | Action |
+|------|--------|
+| 1 | Assert **Ubuntu Server 24.04** — hard fail otherwise |
+| 2 | `apt update && apt upgrade` |
+| 3 | Install `git` |
+| 4 | Clone this repo into `~/forge` (or pull if already present) |
+| 5 | Install Ansible via `pipx` (isolated, no PPA noise) |
+| 6 | Execute the playbook |
+
+### 2. Playbook — three plays, one file
+
+`playbooks/remote_workstation.yml` contains three plays that run in order:
+
+1. **Play 1 — physical host:** desktop, drivers, IDEs, KVM.  The `kvm` role
+   provisions both guest VMs using Ubuntu cloud-init images, waits for SSH,
+   then control passes to the next play.
+2. **Play 2 — `dev-workstation` guest:** CUDA, Bazel, language toolchains,
+   security scanners, doc tooling.
+3. **Play 3 — `forge-infra` guest:** the full infrastructure stack —
+   Vault, Traefik, Cilium, databases, DevOps apps, AI stack,
+   observability, and finally k3s with the three ephemeral workloads.
+
+### 3. Idempotency
+
+Every role is designed to be re-runnable.  Re-running the playbook after a
+partial failure or a config change converges without wiping state.
+
+---
+
+## Service ports (forge-infra)
+
+| Service | Port | Protocol |
+|---------|------|----------|
+| Traefik (HTTP) | 80 | HTTP |
+| Traefik (HTTPS) | 443 | HTTPS |
+| GitLab | 443 | HTTPS |
+| Artifactory | 8081 | HTTP |
+| SonarQube | 9090 | HTTP |
+| Vault | 8200 | HTTP |
+| Prometheus | 9090 | HTTP |
+| Grafana | 3000 | HTTP |
+| Loki | 3100 | HTTP |
+| Ollama | 11434 | HTTP |
+| LiteLLM | 4000 | HTTP |
+| Qdrant | 6333 | HTTP |
+| SearXNG | 8080 | HTTP |
+| Redis | 6379 | TCP |
+| PostgreSQL | 5432 | TCP |
+| SeaweedFS master | 9000 | HTTP |
+| k3s API | 6443 | HTTPS |
+
+---
+
+## VM specs (defaults)
+
+| VM | vCPUs | RAM | Disk | SSH port (host) |
+|----|-------|-----|------|-----------------|
+| dev-workstation | 8 | 24 GB | 60 GB | 2222 |
+| forge-infra | 6 | 24 GB | 180 GB | 2223 |
+
+Tune in `inventory/group_vars/remote_workstation.yml`.
+
+---
+
+## Version pins
+
+All software versions are centralised in `inventory/group_vars/all.yml`.
+To upgrade a single tool, change the value there — no role file needs editing.
+
+Key current pins:
+
+| Tool | Variable | Value |
+|------|----------|-------|
+| Bazel | `bazel_version` | 7.1.1 |
+| Traefik | `traefik_version` | v2.11.2 |
+| Helm | `helm_version` | v3.14.4 |
+| NVIDIA driver branch | `nvidia_driver_branch` | 545 |
+| Node | `node_version` | 20 |
+| Redis | `redis_version` | 7 |
+
+---
+
+## Offline / air-gap operation
+
+`dev-workstation` is designed to continue working when `forge-infra` is
+unreachable.  After an initial fetch/build cycle the local Bazel cache and
+source copies are sufficient for day-to-day development.  When infra comes
+back online, remote cache (`buildbody-cache`) and remote execution
+(`buildbody-executor`) kick in transparently via the Bazel remote
+endpoints configured in `inventory/group_vars/dev_workstation.yml`.
+
+---
+
+## Prototype → Enterprise path
+
+Forge is deliberately collapsed onto three machines for fast iteration.
+Each layer is designed so that splitting it out later requires only inventory
+and variable changes, not role rewrites:
+
+| Prototype | Enterprise target |
+|-----------|-------------------|
+| Vault file backend | Vault HA (Raft / Consul) |
+| SeaweedFS 3 units on one VM | Dedicated SeaweedFS cluster |
+| k3s single-node | Managed Kubernetes (EKS / GKE / on-prem) |
+| Podman containers | Helm charts in the target k8s |
+| local-path PVCs | CSI driver (Ceph / NFS / cloud block) |
+| Single Traefik | Ingress controller + cert-manager |
+| SQLite / file-based state | Shared NFS or distributed state stores |
+
+---
+
+## Contributing
+
+1. Fork, branch, PR — standard flow.
+2. Roles must stay self-contained: `tasks/`, `templates/`, `handlers/`,
+   `defaults/` only.  No cross-role hard dependencies except those declared
+   in the playbook order.
+3. Version pins live in `all.yml`.  Don't hard-code versions inside roles.
+4. Keep everything free/open-source.  If a tool has a paid tier, pin to the
+   free / community edition explicitly.
+
+---
+
+## License
+
+This project is licensed under the **MIT License** — see [`LICENSE`](LICENSE)
+for details.

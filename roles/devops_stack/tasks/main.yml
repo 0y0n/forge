@@ -1,0 +1,82 @@
+# =============================================================================
+# roles/devops_stack/tasks/main.yml
+# GitLab (free tier / CE)  •  JFrog Artifactory OSS  •  SonarQube Community
+# All run as containers via podman (installed by the containers role).
+# Playbook order in forge_infra.yml ensures containers role runs first.
+# =============================================================================
+---
+# ── GitLab ───────────────────────────────────────────────────────────────────
+- name: "devops_stack | pull GitLab image"
+  ansible.builtin.command: >
+    podman pull registry.gitlab.com/gitlab-org/gitlab/gitlab-ce:latest
+  register: gitlab_pull
+  changed_when: "'already present' not in (gitlab_pull.stdout + gitlab_pull.stderr)"
+
+- name: "devops_stack | run GitLab container"
+  ansible.builtin.command: >
+    podman run -d
+      --name gitlab
+      --hostname gitlab.forge.local
+      -p {{ gitlab_port }}:443
+      -p 8022:22
+      -v /srv/gitlab/config:/etc/gitlab
+      -v /srv/gitlab/logs:/var/log/gitlab
+      -v /srv/gitlab/data:/var/opt/gitlab
+      registry.gitlab.com/gitlab-org/gitlab/gitlab-ce:latest
+  args:
+    creates: /srv/gitlab/.running          # crude idempotency marker
+  register: gitlab_run
+
+- name: "devops_stack | mark gitlab running"
+  ansible.builtin.file:
+    path:  /srv/gitlab/.running
+    state: touch
+  when: gitlab_run.changed | default(false)
+
+# ── Artifactory OSS ─────────────────────────────────────────────────────────
+- name: "devops_stack | pull Artifactory OSS image"
+  ansible.builtin.command: >
+    podman pull docker.bintray.io/jfrog/artifactory-oss:latest
+  ignore_errors: true     # mirror may differ; adjust image name if needed
+
+- name: "devops_stack | run Artifactory container"
+  ansible.builtin.command: >
+    podman run -d
+      --name artifactory
+      -p {{ artifactory_port }}:8081
+      -v /srv/artifactory/data:/opt/jfrog/artifactory/var/data
+      docker.bintray.io/jfrog/artifactory-oss:latest
+  args:
+    creates: /srv/artifactory/.running
+  register: arti_run
+  ignore_errors: true
+
+- name: "devops_stack | mark artifactory running"
+  ansible.builtin.file:
+    path:  /srv/artifactory/.running
+    state: touch
+  when: arti_run.changed | default(false)
+
+# ── SonarQube Community ──────────────────────────────────────────────────────
+- name: "devops_stack | pull SonarQube community image"
+  ansible.builtin.command: >
+    podman pull docker.io/sonarqube:community
+
+- name: "devops_stack | run SonarQube container"
+  ansible.builtin.command: >
+    podman run -d
+      --name sonarqube
+      -p {{ sonarqube_port }}:9090
+      -v /srv/sonarqube/data:/opt/sonarqube/data
+      -e SONAR_JDBC_URL=jdbc:postgresql://127.0.0.1:{{ postgresql_port }}/sonarqube
+      -e SONAR_JDBC_USERNAME=sonar
+      docker.io/sonarqube:community
+  args:
+    creates: /srv/sonarqube/.running
+  register: sq_run
+
+- name: "devops_stack | mark sonarqube running"
+  ansible.builtin.file:
+    path:  /srv/sonarqube/.running
+    state: touch
+  when: sq_run.changed | default(false)

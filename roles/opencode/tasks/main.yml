@@ -1,0 +1,20 @@
+# =============================================================================
+# roles/opencode/tasks/main.yml
+# OpenCode CLI — AI-assisted coding from the terminal.
+# Installed globally via npm.
+# =============================================================================
+---
+- name: "opencode | install nodejs & npm"
+  ansible.builtin.apt:
+    name:
+      - nodejs
+      - npm
+    state: present
+    update_cache: true
+
+- name: "opencode | install opencode globally via npm"
+  ansible.builtin.npm:
+    name:    opencode
+    global:  true
+    state:   present
+  # If 'opencode' is not yet on npm, replace with the actual package name / tarball.

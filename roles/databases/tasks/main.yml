@@ -1,0 +1,86 @@
+# =============================================================================
+# roles/databases/tasks/main.yml
+# PostgreSQL  •  SeaweedFS (object storage)  •  DVC (data versioning)
+# =============================================================================
+---
+# ── PostgreSQL ───────────────────────────────────────────────────────────────
+- name: "databases | install postgresql"
+  ansible.builtin.apt:
+    name:
+      - postgresql
+      - postgresql-client
+      - python3-psycopg2     # ansible postgresql module dep
+    state: present
+    update_cache: true
+
+- name: "databases | enable & start postgresql"
+  ansible.builtin.systemd:
+    name:    postgresql
+    enabled: true
+    state:   started
+
+- name: "databases | create databases + users"
+  ansible.builtin.postgresql_db:
+    name: "{{ item.name }}"
+    state: present
+  loop: "{{ postgresql_databases }}"
+  become_user: postgres
+  become_method: su
+
+- name: "databases | create db users"
+  ansible.builtin.postgresql_user:
+    name:     "{{ item.owner }}"
+    db:       "{{ item.name }}"
+    priv:     ALL
+    state:    present
+  loop: "{{ postgresql_databases }}"
+  become_user: postgres
+  become_method: su
+
+# ── SeaweedFS ────────────────────────────────────────────────────────────────
+- name: "databases | download SeaweedFS"
+  ansible.builtin.get_url:
+    url:  "https://github.com/seaweedfs/seaweedfs/releases/latest/download/linux_amd64.tar.gz"
+    dest: /tmp/seaweedfs.tar.gz
+    mode: "0644"
+
+- name: "databases | unpack SeaweedFS"
+  ansible.builtin.unarchive:
+    src:        /tmp/seaweedfs.tar.gz
+    dest:       /usr/local/bin
+    remote_src: true
+    mode:       "0755"
+
+- name: "databases | create SeaweedFS data dir"
+  ansible.builtin.file:
+    path:  "{{ seaweedfs_data_dir }}"
+    state: directory
+    mode:  "0755"
+
+- name: "databases | deploy SeaweedFS systemd units"
+  ansible.builtin.template:
+    src:  seaweedfs_{{ item }}.service.j2
+    dest: /etc/systemd/system/seaweedfs_{{ item }}.service
+    mode: "0644"
+  loop:
+    - master
+    - volume
+    - filer
+  notify: restart seaweedfs
+
+- name: "databases | enable & start SeaweedFS"
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name:    "seaweedfs_{{ item }}"
+    enabled: true
+    state:   started
+  loop:
+    - master
+    - volume
+    - filer
+
+# ── DVC ──────────────────────────────────────────────────────────────────────
+- name: "databases | install DVC via pip"
+  ansible.builtin.pip:
+    name:       dvc
+    executable: pip3

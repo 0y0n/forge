@@ -1,0 +1,10 @@
+[Unit]
+Description=SeaweedFS Filer
+After=seaweedfs_master.service
+
+[Service]
+ExecStart=/usr/local/bin/weed filer -master=127.0.0.1:{{ seaweedfs_master_port }}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

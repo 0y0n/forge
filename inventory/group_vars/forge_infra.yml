@@ -1,0 +1,48 @@
+# =============================================================================
+# forge_infra.yml  —  variables for the forge-infra KVM guest
+# =============================================================================
+
+# ── internal service ports (all behind Traefik, but explicit here for clarity) ─
+gitlab_port:          443
+artifactory_port:     8081
+sonarqube_port:       9090
+prometheus_port:      9090
+grafana_port:         3000
+loki_port:            3100
+qdrant_port:          6333
+searxng_port:         8080
+ollama_port:          11434
+litellm_port:         4000
+redis_port:           6379
+postgresql_port:      5432
+seaweedfs_master_port: 9000
+seaweedfs_volume_port: 8080
+traefik_port:         80
+traefik_port_https:   443
+vault_port:           8200
+k3s_api_port:         6443
+
+# ── k3s workload definitions ─────────────────────────────────────────────────
+k3s_runners:
+  - name:   gitlab-runner
+    image:  "ubuntu:24.04"           # placeholder; actual job image built by packer
+    vcpus:  2
+    memory: 4Gi
+  - name:   buildbody-cache
+    image:  "bazelbuild/remote-cache:latest"  # placeholder
+    vcpus:  2
+    memory: 4Gi
+  - name:   buildbody-executor
+    image:  "ubuntu:24.04"           # placeholder; mirrors dev-workstation tooling
+    vcpus:  4
+    memory: 6Gi
+
+# ── PostgreSQL ───────────────────────────────────────────────────────────────
+postgresql_databases:
+  - name: gitlab
+    owner: gitlab
+  - name: sonarqube
+    owner: sonar
+
+# ── SeaweedFS ────────────────────────────────────────────────────────────────
+seaweedfs_data_dir: /data/seaweedfs

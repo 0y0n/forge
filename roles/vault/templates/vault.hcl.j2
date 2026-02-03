@@ -1,0 +1,15 @@
+# Vault server configuration — prototype (file backend, no TLS)
+# Harden for production: TLS, HA backend (Raft or Consul), mlock enabled.
+
+ui = true
+
+listener "tcp" {
+  address     = "0.0.0.0:{{ vault_port }}"
+  tls_disable = 1          # prototype only
+}
+
+storage "file" {
+  path = "/var/lib/vault/data"
+}
+
+disable_mlock = true

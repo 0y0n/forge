@@ -1,0 +1,94 @@
+# =============================================================================
+# roles/dev_tools/tasks/main.yml
+# Java / Python / Rust toolchains, formatters, linters, metrics.
+# =============================================================================
+---
+# ── system deps ──────────────────────────────────────────────────────────────
+- name: "dev_tools | install system prerequisites"
+  ansible.builtin.apt:
+    name:
+      - build-essential
+      - curl
+      - wget
+      - pkg-config
+      - python3
+      - python3-pip
+      - python3-venv
+      - default-jdk            # OpenJDK 17+
+      - maven
+      - gradle
+    state: present
+    update_cache: true
+
+# ── Rust ─────────────────────────────────────────────────────────────────────
+- name: "dev_tools | install rustup"
+  ansible.builtin.shell: >
+    curl --proto '=https' --tlsv1.2 -sSf {{ rustup_url }} | sh -s -- -y
+  args:
+    executable: /bin/bash
+    creates: "{{ ansible_env.HOME }}/.cargo/bin/rustup"
+  environment:
+    CARGO_HOME: "{{ ansible_env.HOME }}/.cargo"
+    RUSTUP_HOME: "{{ ansible_env.HOME }}/.rustup"
+
+- name: "dev_tools | add cargo to PATH"
+  ansible.builtin.copy:
+    dest: /etc/profile.d/cargo.sh
+    content: |
+      export CARGO_HOME={{ ansible_env.HOME }}/.cargo
+      export RUSTUP_HOME={{ ansible_env.HOME }}/.rustup
+      export PATH=$CARGO_HOME/bin:$PATH
+    mode: "0644"
+
+- name: "dev_tools | install rustfmt + clippy"
+  ansible.builtin.command: >
+    {{ ansible_env.HOME }}/.cargo/bin/rustup component add rustfmt clippy
+  environment:
+    CARGO_HOME:  "{{ ansible_env.HOME }}/.cargo"
+    RUSTUP_HOME: "{{ ansible_env.HOME }}/.rustup"
+    PATH:        "{{ ansible_env.HOME }}/.cargo/bin:{{ ansible_env.PATH }}"
+
+# ── Python ───────────────────────────────────────────────────────────────────
+- name: "dev_tools | install Python tools via pip"
+  ansible.builtin.pip:
+    name:
+      - black            # formatter
+      - isort            # import sorter
+      - ruff             # linter (replaces flake8 + pylint speed)
+      - pylint
+      - pytest
+      - coverage
+      - mypy             # static type checker
+    executable: pip3
+
+# ── Java ─────────────────────────────────────────────────────────────────────
+- name: "dev_tools | install checkstyle (via wget — latest release jar)"
+  ansible.builtin.get_url:
+    url:  "https://github.com/checkstyle/checkstyle/releases/download/checkstyle_10.14.2/checkstyle-10.14.2-all.jar"
+    dest: /opt/checkstyle.jar
+    mode: "0644"
+
+- name: "dev_tools | install spotbugs (static analysis)"
+  ansible.builtin.get_url:
+    url:  "https://github.com/spotbugs/spotbugs/releases/download/4.8.6/spotbugs-4.8.6.zip"
+    dest: /tmp/spotbugs.zip
+    mode: "0644"
+
+- name: "dev_tools | unzip spotbugs"
+  ansible.builtin.unarchive:
+    src:  /tmp/spotbugs.zip
+    dest: /opt
+    remote_src: true
+    creates: /opt/spotbugs-4.8.6
+
+- name: "dev_tools | symlink spotbugs"
+  ansible.builtin.file:
+    path:  /usr/local/bin/spotbugs
+    src:   /opt/spotbugs-4.8.6/bin/spotbugs
+    state: link
+
+# ── DCS (Distributed Control System helper — stub placeholder) ───────────────
+# Replace URL / package with actual DCS binary when available.
+- name: "dev_tools | install dcs (placeholder — git-based)"
+  ansible.builtin.debug:
+    msg: "DCS binary not yet defined; add to this task when artifact is published."

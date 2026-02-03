@@ -1,0 +1,110 @@
+# =============================================================================
+# roles/ai_stack/tasks/main.yml
+# Local AI inference stack:
+#   Ollama      — local LLM serving
+#   Qdrant      — vector DB
+#   SearXNG     — local search aggregator
+#   LiteLLM     — unified LLM proxy
+#   Redis       — cache / message broker
+# =============================================================================
+---
+# ── Ollama ───────────────────────────────────────────────────────────────────
+- name: "ai_stack | install ollama"
+  ansible.builtin.shell: >
+    curl -fsSL https://ollama.com/install.sh | sh
+  args:
+    executable: /bin/bash
+    creates: /usr/local/bin/ollama
+
+- name: "ai_stack | enable & start ollama"
+  ansible.builtin.systemd:
+    name:    ollama
+    enabled: true
+    state:   started
+
+# ── Qdrant ───────────────────────────────────────────────────────────────────
+- name: "ai_stack | pull Qdrant container"
+  ansible.builtin.command: >
+    podman pull docker.io/qdrantai/qdrant:latest
+
+- name: "ai_stack | run Qdrant"
+  ansible.builtin.command: >
+    podman run -d
+      --name qdrant
+      -p {{ qdrant_port }}:6333
+      -v /srv/qdrant/storage:/qdrant/storage
+      docker.io/qdrantai/qdrant:latest
+  args:
+    creates: /srv/qdrant/.running
+  register: qdrant_run
+
+- name: "ai_stack | mark qdrant running"
+  ansible.builtin.file:
+    path:  /srv/qdrant/.running
+    state: touch
+  when: qdrant_run.changed | default(false)
+
+# ── SearXNG ──────────────────────────────────────────────────────────────────
+- name: "ai_stack | pull SearXNG container"
+  ansible.builtin.command: >
+    podman pull docker.io/searxng/searxng:latest
+
+- name: "ai_stack | run SearXNG"
+  ansible.builtin.command: >
+    podman run -d
+      --name searxng
+      -p {{ searxng_port }}:8080
+      docker.io/searxng/searxng:latest
+  args:
+    creates: /srv/searxng/.running
+  register: searxng_run
+
+- name: "ai_stack | mark searxng running"
+  ansible.builtin.file:
+    path:  /srv/searxng/.running
+    state: touch
+  when: searxng_run.changed | default(false)
+
+# ── LiteLLM ──────────────────────────────────────────────────────────────────
+- name: "ai_stack | install liteLLM via pip"
+  ansible.builtin.pip:
+    name:       litellm[proxy]
+    executable: pip3
+
+- name: "ai_stack | deploy liteLLM systemd unit"
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/litellm.service
+    content: |
+      [Unit]
+      Description=LiteLLM Proxy
+      After=network-online.target ollama.service
+
+      [Service]
+      ExecStart=/usr/bin/env python3 -m litellm.proxy.proxy_cli --port {{ litellm_port }}
+      Restart=on-failure
+      Environment=OLLAMA_BASE=http://127.0.0.1:{{ ollama_port }}
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: "0644"
+  notify: restart litellm
+
+- name: "ai_stack | enable & start liteLLM"
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name:    litellm
+    enabled: true
+    state:   started
+
+# ── Redis ────────────────────────────────────────────────────────────────────
+- name: "ai_stack | install redis-server"
+  ansible.builtin.apt:
+    name:         redis-server
+    state:        present
+    update_cache: true
+
+- name: "ai_stack | enable & start redis"
+  ansible.builtin.systemd:
+    name:    redis-server
+    enabled: true
+    state:   started

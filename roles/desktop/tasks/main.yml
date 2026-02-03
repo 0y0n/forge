@@ -1,0 +1,44 @@
+# =============================================================================
+# roles/desktop/tasks/main.yml
+# Minimal XFCE4 desktop + Google Chrome.
+# Deliberately avoids GNOME / KDE bloat to keep RSS low for LLM headroom.
+# =============================================================================
+---
+- name: "desktop | install xfce4 core (minimal)"
+  ansible.builtin.apt:
+    name:
+      - xfce4
+      - xfce4-terminal
+      - xfce4-panel
+      - xfce4-desktop
+      - xfce4-session
+      - lightdm
+      - lightdm-gtk-greeter
+      - xdg-user-dirs
+    state: present
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: "desktop | enable lightdm"
+  ansible.builtin.systemd:
+    name:    lightdm
+    enabled: true
+    state:   started
+
+# ── Chrome ───────────────────────────────────────────────────────────────────
+- name: "desktop | download Chrome .deb"
+  ansible.builtin.get_url:
+    url:  "https://dl.google.com/linux/direct/google-chrome-stable_amd64.deb"
+    dest: /tmp/chrome.deb
+    mode: "0644"
+
+- name: "desktop | install Chrome .deb"
+  ansible.builtin.apt:
+    deb: /tmp/chrome.deb
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: "desktop | cleanup Chrome .deb"
+  ansible.builtin.file:
+    path: /tmp/chrome.deb
+    state: absent

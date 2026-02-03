@@ -1,0 +1,10 @@
+[Unit]
+Description=SeaweedFS Volume
+After=seaweedfs_master.service
+
+[Service]
+ExecStart=/usr/local/bin/weed volume -dir={{ seaweedfs_data_dir }}/volume -maddr=127.0.0.1:{{ seaweedfs_master_port }} -port={{ seaweedfs_volume_port }}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

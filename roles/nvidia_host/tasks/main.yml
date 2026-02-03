@@ -1,0 +1,23 @@
+# =============================================================================
+# roles/nvidia_host/tasks/main.yml
+# NVIDIA driver on the PHYSICAL host (not inside a container / VM).
+# Uses ubuntu-drivers-common for simplicity; branch pinned in group_vars.
+# =============================================================================
+---
+- name: "nvidia_host | install ubuntu-drivers-common"
+  ansible.builtin.apt:
+    name:
+      - ubuntu-drivers-common
+      - nvidia-utils-{{ nvidia_driver_branch }}
+    state: present
+    update_cache: true
+
+- name: "nvidia_host | install recommended driver"
+  ansible.builtin.command: ubuntu-drivers autoinstall
+  register: nvidia_install
+  changed_when: "'install' in nvidia_install.stdout.lower()"
+
+- name: "nvidia_host | reboot if kernel module changed"
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+  when: nvidia_install.changed

@@ -1,0 +1,27 @@
+# =============================================================================
+# roles/base/tasks/main.yml
+# Shared baseline: OS validation, apt refresh, git.
+# =============================================================================
+---
+- name: "base | verify Ubuntu 24.04"
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == "Ubuntu"
+      - ansible_distribution_version == "24.04"
+    fail_msg: "Forge requires Ubuntu Server 24.04. Detected: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+
+- name: "base | update apt cache"
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600   # re-fetch only if stale > 1 h
+
+- name: "base | upgrade all packages"
+  ansible.builtin.apt:
+    upgrade: dist
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: "base | install git"
+  ansible.builtin.apt:
+    name: git
+    state: present

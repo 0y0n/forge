@@ -1,0 +1,19 @@
+# Traefik static configuration — prototype
+# Dynamic routes will be added via file provider (conf.d/).
+
+api:
+  dashboard: true          # accessible at http://host:9090/dashboard/
+
+entryPoints:
+  web:
+    address: ":{{ traefik_port }}"
+  websecure:
+    address: ":{{ traefik_port_https }}"
+
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch:     true
+
+log:
+  level: INFO

@@ -1,0 +1,10 @@
+# =============================================================================
+# dev_workstation.yml  —  variables for the dev-workstation KVM guest
+# =============================================================================
+
+# Bazel remote cache / executor endpoint (populated by forge-infra after boot)
+bazel_remote_cache_url: ""               # e.g. http://forge-infra:8080
+bazel_remote_exec_url:  ""               # e.g. http://forge-infra:8081
+
+# DCS version alias used by dev_tools role
+dcs_version: "latest"

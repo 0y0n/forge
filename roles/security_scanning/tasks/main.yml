@@ -1,0 +1,49 @@
+# =============================================================================
+# roles/security_scanning/tasks/main.yml
+# Static & secret scanning: Semgrep, Trivy, Gitleaks.
+# =============================================================================
+---
+# ── Semgrep ──────────────────────────────────────────────────────────────────
+- name: "security_scanning | install semgrep"
+  ansible.builtin.pip:
+    name:       semgrep
+    executable: pip3
+
+# ── Trivy ────────────────────────────────────────────────────────────────────
+- name: "security_scanning | add Trivy apt repo key"
+  ansible.builtin.shell: >
+    wget -qO - https://aquasecurity.github.io/trivy/main/releases/signing/trivy.pub |
+    gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+  args:
+    creates: /usr/share/keyrings/trivy.gpg
+
+- name: "security_scanning | add Trivy apt repo"
+  ansible.builtin.apt_repository:
+    repo:     "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy/releases/apt/ stable main"
+    state:    present
+    filename: trivy
+
+- name: "security_scanning | install trivy"
+  ansible.builtin.apt:
+    name:         trivy
+    state:        present
+    update_cache: true
+
+# ── Gitleaks ─────────────────────────────────────────────────────────────────
+- name: "security_scanning | install gitleaks binary"
+  ansible.builtin.get_url:
+    url:  "https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x86-64.tar.gz"
+    dest: /tmp/gitleaks.tar.gz
+    mode: "0644"
+
+- name: "security_scanning | unpack gitleaks"
+  ansible.builtin.unarchive:
+    src:        /tmp/gitleaks.tar.gz
+    dest:       /usr/local/bin
+    remote_src: true
+    mode:       "0755"
+
+- name: "security_scanning | cleanup gitleaks tarball"
+  ansible.builtin.file:
+    path:  /tmp/gitleaks.tar.gz
+    state: absent

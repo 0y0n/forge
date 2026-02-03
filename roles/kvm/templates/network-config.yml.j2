@@ -1,0 +1,11 @@
+# =============================================================================
+# roles/kvm/templates/network-config.yml.j2
+# Cloud-init network v2 (netplan-style).  DHCP on both NICs for the
+# libvirt default network.  Static IPs can replace this later.
+# =============================================================================
+version: 2
+ethernets:
+  ens3:
+    dhcp4: true
+  ens4:
+    dhcp4: true

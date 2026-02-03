@@ -1,0 +1,56 @@
+# =============================================================================
+# roles/vault/tasks/main.yml
+# HashiCorp Vault OSS — secret management.
+# =============================================================================
+---
+- name: "vault | add HashiCorp GPG key"
+  ansible.builtin.shell: >
+    wget -qO - https://apt.releases.hashicorp.com/gpg |
+    gpg --dearmor -o /usr/share/keyrings/hashicorp.gpg
+  args:
+    creates: /usr/share/keyrings/hashicorp.gpg
+
+- name: "vault | add HashiCorp apt repo"
+  ansible.builtin.apt_repository:
+    repo: >
+      deb [signed-by=/usr/share/keyrings/hashicorp.gpg]
+      https://apt.releases.hashicorp.com
+      {{ ansible_distribution_release }} main
+    state:    present
+    filename: hashicorp
+
+- name: "vault | install vault"
+  ansible.builtin.apt:
+    name:         vault
+    state:        present
+    update_cache: true
+
+- name: "vault | create vault service user"
+  ansible.builtin.user:
+    name:    vault
+    system:  true
+    home:    /var/lib/vault
+    shell:   /usr/sbin/nologin
+
+- name: "vault | deploy systemd unit"
+  ansible.builtin.template:
+    src:  vault.service.j2
+    dest: /etc/systemd/system/vault.service
+    mode: "0644"
+  notify: restart vault
+
+- name: "vault | deploy vault config"
+  ansible.builtin.template:
+    src:  vault.hcl.j2
+    dest: /etc/vault.d/vault.hcl
+    mode: "0640"
+    owner: vault
+    group: vault
+  notify: restart vault
+
+- name: "vault | enable & start vault"
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name:    vault
+    enabled: true
+    state:   started

@@ -1,0 +1,75 @@
+# =============================================================================
+# buildbody-cache.yaml.j2
+# Bazel remote-cache service.  Uses bazelbuild/remote-cache or a custom image.
+# PVC backed by local-path-provisioner for persistence across restarts.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name:      buildbody-cache
+  namespace: forge
+  labels:
+    app: buildbody-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: buildbody-cache
+  template:
+    metadata:
+      labels:
+        app: buildbody-cache
+    spec:
+      containers:
+        - name:    cache
+          # TODO: swap with your preferred remote-cache image
+          image:   bazelbuild/remote-cache:latest
+          ports:
+            - containerPort: 8080
+              name:          http
+            - containerPort: 9092
+              name:          grpc
+          resources:
+            requests:
+              cpu:    500m
+              memory: 2Gi
+            limits:
+              cpu:    "{{ k3s_runners[1].vcpus }}"
+              memory: "{{ k3s_runners[1].memory }}"
+          volumeMounts:
+            - name:      cache-data
+              mountPath: /tmp/cache
+      volumes:
+        - name: cache-data
+          persistentVolumeClaim:
+            claimName: buildbody-cache-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name:      buildbody-cache-pvc
+  namespace: forge
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name:      buildbody-cache
+  namespace: forge
+spec:
+  selector:
+    app: buildbody-cache
+  ports:
+    - name:       http
+      port:       8080
+      targetPort: http
+    - name:       grpc
+      port:       9092
+      targetPort: grpc

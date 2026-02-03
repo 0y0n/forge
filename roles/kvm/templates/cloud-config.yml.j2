@@ -1,0 +1,45 @@
+# =============================================================================
+# roles/kvm/templates/cloud-config.yml.j2
+# Cloud-init user-data template rendered per VM.
+# =============================================================================
+#cloud-config
+hostname: {{ vm.name }}
+fqdn:     {{ vm.name }}.forge.local
+
+users:
+  - default
+  - name: forge
+    groups: [ sudo, adm, cdrom, plugdev ]
+    shell:  /bin/bash
+    ssh_authorized_keys:
+      - {{ forge_pubkey }}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+
+ssh_pwauth: false
+
+default_user:
+  name:               forge
+  ssh_authorized_keys:
+    - {{ forge_pubkey }}
+  sudo:               ALL=(ALL) NOPASSWD:ALL
+  lock_passwd:        true
+
+package_update:  true
+package_upgrade: true
+
+packages:
+  - openssh-server
+  - git
+  - curl
+  - wget
+  - nano
+
+# Disable root login hardening
+ssh_import_id: []
+disable_root: true
+
+# Final message logged inside the guest
+final_message: |
+  Forge guest {{ vm.name }} is ready.
+  Rendered at: $TIMESTAMP

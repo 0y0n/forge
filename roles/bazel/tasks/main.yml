@@ -1,0 +1,37 @@
+# =============================================================================
+# roles/bazel/tasks/main.yml
+# Bazel — hermetic build system.  Binary install from bazelbuild GitHub.
+# =============================================================================
+---
+- name: "bazel | install bazel dependencies"
+  ansible.builtin.apt:
+    name:
+      - curl
+      - openjdk-17-jdk
+      - unzip
+    state: present
+
+- name: "bazel | download bazel binary"
+  ansible.builtin.get_url:
+    url:  "https://github.com/bazelbuild/bazel/releases/download/{{ bazel_version }}/bazel-{{ bazel_version }}-installer-linux-x86-64.sh"
+    dest: /tmp/bazel-installer.sh
+    mode: "0755"
+
+- name: "bazel | run installer"
+  ansible.builtin.command: /tmp/bazel-installer.sh --prefix=/usr/local
+  args:
+    creates: /usr/local/bin/bazel
+
+- name: "bazel | cleanup installer"
+  ansible.builtin.file:
+    path: /tmp/bazel-installer.sh
+    state: absent
+
+- name: "bazel | verify"
+  ansible.builtin.command: bazel version
+  register: bazel_ver
+  changed_when: false
+
+- name: "bazel | log version"
+  ansible.builtin.debug:
+    msg: "{{ bazel_ver.stdout_lines[0] }}"

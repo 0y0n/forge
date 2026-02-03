@@ -1,0 +1,115 @@
+# =============================================================================
+# roles/orchestration/tasks/main.yml
+# k3s (lightweight k8s)  •  Helm  •  local-path-provisioner  •  Cilium CNI
+# Then deploys the three ephemeral workload types via Kubernetes manifests.
+# =============================================================================
+---
+# ── k3s ──────────────────────────────────────────────────────────────────────
+- name: "orchestration | install k3s"
+  ansible.builtin.shell: >
+    curl -sfL https://get.k3s.io | K3S_VERSION={{ k3s_version }}
+    sh -s -- server
+      --disable traefik
+      --disable servicelb
+      --flannel-iface=eth0
+  args:
+    executable: /bin/bash
+    creates: /usr/local/bin/k3s
+  environment:
+    K3S_VERSION: "{{ k3s_version }}"
+
+- name: "orchestration | wait for k3s API"
+  ansible.builtin.wait_for:
+    host:    127.0.0.1
+    port:    "{{ k3s_api_port }}"
+    delay:   5
+    timeout: 120
+    state:   started
+
+- name: "orchestration | symlink kubectl"
+  ansible.builtin.file:
+    path:  /usr/local/bin/kubectl
+    src:   /usr/local/bin/k3s
+    state: link
+
+# ── Helm ─────────────────────────────────────────────────────────────────────
+- name: "orchestration | install Helm"
+  ansible.builtin.shell: >
+    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  args:
+    executable: /bin/bash
+    creates: /usr/local/bin/helm
+
+# ── local-path-provisioner ───────────────────────────────────────────────────
+- name: "orchestration | apply local-path-provisioner"
+  ansible.builtin.command: >
+    kubectl apply -f
+    https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: "orchestration | set local-path as default StorageClass"
+  ansible.builtin.command: >
+    kubectl patch storageclass local-path
+      -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+# ── Cilium CNI ───────────────────────────────────────────────────────────────
+- name: "orchestration | install Cilium into k3s"
+  ansible.builtin.command: >
+    cilium install
+      --set=k3s.enabled=true
+      --set=operator.replicas=1
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  # cilium CLI installed by network_policy role
+
+- name: "orchestration | wait for cilium to be ready"
+  ansible.builtin.command: cilium status --wait
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  register: cilium_status
+  retries: 10
+  delay: 15
+  until: cilium_status.rc == 0
+
+# ── Workload manifests ───────────────────────────────────────────────────────
+- name: "orchestration | create forge k8s namespace"
+  ansible.builtin.command: >
+    kubectl create namespace forge --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: "orchestration | deploy gitlab-runner manifest"
+  ansible.builtin.template:
+    src:  gitlab-runner.yaml.j2
+    dest: /tmp/gitlab-runner.yaml
+    mode: "0644"
+
+- name: "orchestration | apply gitlab-runner"
+  ansible.builtin.command: kubectl apply -f /tmp/gitlab-runner.yaml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: "orchestration | deploy buildbody-cache manifest"
+  ansible.builtin.template:
+    src:  buildbody-cache.yaml.j2
+    dest: /tmp/buildbody-cache.yaml
+    mode: "0644"
+
+- name: "orchestration | apply buildbody-cache"
+  ansible.builtin.command: kubectl apply -f /tmp/buildbody-cache.yaml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: "orchestration | deploy buildbody-executor manifest"
+  ansible.builtin.template:
+    src:  buildbody-executor.yaml.j2
+    dest: /tmp/buildbody-executor.yaml
+    mode: "0644"
+
+- name: "orchestration | apply buildbody-executor"
+  ansible.builtin.command: kubectl apply -f /tmp/buildbody-executor.yaml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml

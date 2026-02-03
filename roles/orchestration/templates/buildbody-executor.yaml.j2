@@ -1,0 +1,43 @@
+# =============================================================================
+# buildbody-executor.yaml.j2
+# Remote-execution worker.  Mirrors the dev-workstation tool set.
+# Image placeholder — bake with Packer using the dev_tools recipe.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name:      buildbody-executor
+  namespace: forge
+  labels:
+    app: buildbody-executor
+spec:
+  replicas: 1                        # scale horizontally for throughput
+  selector:
+    matchLabels:
+      app: buildbody-executor
+  template:
+    metadata:
+      labels:
+        app: buildbody-executor
+    spec:
+      containers:
+        - name:    executor
+          # TODO: replace with Packer-baked image (bazel + java/python/rust tools)
+          image:   ubuntu:24.04
+          command: ["sleep", "infinity"]
+          resources:
+            requests:
+              cpu:    1
+              memory: 4Gi
+            limits:
+              cpu:    "{{ k3s_runners[2].vcpus }}"
+              memory: "{{ k3s_runners[2].memory }}"
+          env:
+            - name:  BAZEL_CACHE_URL
+              value: "http://buildbody-cache.forge:8080"
+          volumeMounts:
+            - name:      tmp-work
+              mountPath: /tmp/work
+      volumes:
+        - name: tmp-work
+          emptyDir: {}
