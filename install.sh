@@ -94,6 +94,7 @@ info "Starting Ansible playbook for remote-workstation …"
 cd "$REPO_DIR"
 
 if ! ansible-playbook \
+  --ask-become-pass \
   -i inventory/hosts.yml \
   playbooks/remote_workstation.yml \
   --connection=local \
