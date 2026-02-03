@@ -2,13 +2,13 @@
 # ==============================================================================
 # Forge — Bootstrap installer for remote-workstation
 # 
-# SECURITY: Never pipe scripts directly to sudo bash from the internet.
+# SECURITY: Never pipe scripts directly to bash from the internet.
 # 
 # Recommended installation procedure:
 #   1. curl -fsSL https://raw.githubusercontent.com/0y0n/forge/main/install.sh -o install.sh
 #   2. less install.sh        # Review the script content
 #   3. chmod +x install.sh
-#   4. sudo ./install.sh
+#   4. ./install.sh           # Run as regular user; script uses sudo internally when needed
 # ==============================================================================
 set -euo pipefail
 
@@ -37,30 +37,27 @@ if dpkg -s ubuntu-desktop >/dev/null 2>&1; then
 fi
 info "OS check passed  →  Ubuntu Server ${VERSION_ID}"
 
-# ── 2. Privilege check ───────────────────────────────────────────────────────
-if [[ $EUID -ne 0 ]]; then
-  abort "This script must be run as root.
+# ── 2. Privilege check ──────────────────────────────────────────────────────
+# This script must NOT be run as root; it uses sudo internally when needed
+if [[ $EUID -eq 0 ]]; then
+  abort "This script must be run as a regular user, not as root.
 
-Please follow the secure installation procedure:
+Please run:
+  ./install.sh
 
-  1. curl -fsSL https://raw.githubusercontent.com/0y0n/forge/main/install.sh -o install.sh
-  2. less install.sh        # Review the script content
-  3. chmod +x install.sh
-  4. sudo ./install.sh
-
-Never pipe internet scripts directly to sudo bash."
+The script will use sudo internally for commands that require elevated privileges."
 fi
 
 # ── 3. Update & upgrade ─────────────────────────────────────────────────────
 info "Updating package index …"
-apt-get update -qq
+sudo apt-get update -qq
 
 info "Upgrading installed packages …"
-DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
+DEBIAN_FRONTEND=noninteractive sudo apt-get upgrade -y -qq
 
-# ── 4. Install git ──────────────────────────────────────────────────────────
+# ── 4. Install git ──────────────────────────────────────────────────────
 info "Ensuring git is installed …"
-apt-get install -y -qq git
+sudo apt-get install -y -qq git
 
 # ── 5. Clone Forge repository ────────────────────────────────────────────────
 if [[ -d "$REPO_DIR/.git" ]]; then
@@ -77,12 +74,12 @@ fi
 info "Installing Ansible …"
 if ! command -v ansible-playbook &>/dev/null; then
   # Install pipx (lightweight, isolated Python app installer)
-  apt-get install -y -qq pipx
+  sudo apt-get install -y -qq pipx
   
   # Install ansible via pipx (creates isolated venv automatically)
   export PIPX_HOME=/opt/pipx
   export PIPX_BIN_DIR=/usr/local/bin
-  pipx install --include-deps ansible
+  sudo pipx install --include-deps ansible
   
   # Verify installation succeeded
   if ! command -v ansible-playbook &>/dev/null; then

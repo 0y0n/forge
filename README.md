@@ -11,7 +11,7 @@
 
 ## Quick start
 
-**Never pipe scripts directly to sudo bash from the internet.** Follow this secure procedure:
+**Never pipe scripts directly to bash from the internet.** Follow this secure procedure:
 
 ```bash
 # 1. Download the installer
@@ -23,11 +23,15 @@ less install.sh
 # 3. Make it executable
 chmod +x install.sh
 
-# 4. Run with sudo
-sudo ./install.sh
+# 4. Run as a regular user
+./install.sh
 ```
 
 The script validates the OS, clones this repo, installs Ansible, and runs the playbook.
+It uses `sudo` internally for commands that require elevated privileges.
+
+> **Important:** Run as a regular user, not as root. The script will prompt for
+> your password when sudo is needed.
 
 > **Prerequisite:** a fresh **Ubuntu Server 24.04 LTS** install on bare metal
 > or a VM with at least the specs listed in [Hardware](#hardware).
