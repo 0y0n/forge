@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Forge — Bootstrap installer for remote-workstation
-# Usage:  curl -fsSL https://github.com/0y0n/forge/install.sh | bash
+# 
+# SECURITY: Never pipe scripts directly to sudo bash from the internet.
+# 
+# Recommended installation procedure:
+#   1. curl -fsSL https://raw.githubusercontent.com/0y0n/forge/main/install.sh -o install.sh
+#   2. less install.sh        # Review the script content
+#   3. chmod +x install.sh
+#   4. sudo ./install.sh
 # ==============================================================================
 set -euo pipefail
 
@@ -32,8 +39,16 @@ info "OS check passed  →  Ubuntu Server ${VERSION_ID}"
 
 # ── 2. Privilege check ───────────────────────────────────────────────────────
 if [[ $EUID -ne 0 ]]; then
-  info "Re-executing with sudo …"
-  exec sudo bash "$0" "$@"
+  abort "This script must be run as root.
+
+Please follow the secure installation procedure:
+
+  1. curl -fsSL https://raw.githubusercontent.com/0y0n/forge/main/install.sh -o install.sh
+  2. less install.sh        # Review the script content
+  3. chmod +x install.sh
+  4. sudo ./install.sh
+
+Never pipe internet scripts directly to sudo bash."
 fi
 
 # ── 3. Update & upgrade ─────────────────────────────────────────────────────

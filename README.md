@@ -11,12 +11,23 @@
 
 ## Quick start
 
+**Never pipe scripts directly to sudo bash from the internet.** Follow this secure procedure:
+
 ```bash
-curl -fsSL https://github.com/0y0n/forge/raw/main/install.sh | bash
+# 1. Download the installer
+curl -fsSL https://raw.githubusercontent.com/0y0n/forge/main/install.sh -o install.sh
+
+# 2. Review the script content
+less install.sh
+
+# 3. Make it executable
+chmod +x install.sh
+
+# 4. Run with sudo
+sudo ./install.sh
 ```
 
-That is it.  The script validates the OS, clones this repo, installs Ansible,
-and runs the playbook.  No manual steps required.
+The script validates the OS, clones this repo, installs Ansible, and runs the playbook.
 
 > **Prerequisite:** a fresh **Ubuntu Server 24.04 LTS** install on bare metal
 > or a VM with at least the specs listed in [Hardware](#hardware).
@@ -177,8 +188,8 @@ partial failure or a config change converges without wiping state.
 
 | VM | vCPUs | RAM | Disk | SSH port (host) |
 |----|-------|-----|------|-----------------|
-| dev-workstation | 8 | 24 GB | 60 GB | 2222 |
-| forge-infra | 6 | 24 GB | 180 GB | 2223 |
+| dev-workstation | 8 | 24 GB | 120 GB | 2222 |
+| forge-infra | 6 | 24 GB | 200 GB | 2223 |
 
 Tune in `inventory/group_vars/remote_workstation.yml`.
 
