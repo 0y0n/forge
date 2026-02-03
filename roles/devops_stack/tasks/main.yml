@@ -66,7 +66,7 @@
   ansible.builtin.command: >
     podman run -d
       --name sonarqube
-      -p {{ sonarqube_port }}:9090
+      -p {{ sonarqube_port }}:9000
       -v /srv/sonarqube/data:/opt/sonarqube/data
       -e SONAR_JDBC_URL=jdbc:postgresql://127.0.0.1:{{ postgresql_port }}/sonarqube
       -e SONAR_JDBC_USERNAME=sonar

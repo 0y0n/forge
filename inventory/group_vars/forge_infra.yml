@@ -3,19 +3,19 @@
 # =============================================================================
 
 # ── internal service ports (all behind Traefik, but explicit here for clarity) ─
-gitlab_port:          443
+gitlab_port:          8443         # GitLab web UI (changed from 443 to avoid conflict)
 artifactory_port:     8081
-sonarqube_port:       9090
+sonarqube_port:       9000         # SonarQube web UI (changed from 9090)
 prometheus_port:      9090
 grafana_port:         3000
 loki_port:            3100
 qdrant_port:          6333
-searxng_port:         8080
+searxng_port:         8888         # SearXNG web UI (changed from 8080)
 ollama_port:          11434
 litellm_port:         4000
 redis_port:           6379
 postgresql_port:      5432
-seaweedfs_master_port: 9000
+seaweedfs_master_port: 9333        # SeaweedFS master (changed from 9000)
 seaweedfs_volume_port: 8080
 traefik_port:         80
 traefik_port_https:   443

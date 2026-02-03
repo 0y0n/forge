@@ -162,25 +162,26 @@ partial failure or a config change converges without wiping state.
 
 ## Service ports (forge-infra)
 
-| Service | Port | Protocol |
-|---------|------|----------|
-| Traefik (HTTP) | 80 | HTTP |
-| Traefik (HTTPS) | 443 | HTTPS |
-| GitLab | 443 | HTTPS |
-| Artifactory | 8081 | HTTP |
-| SonarQube | 9090 | HTTP |
-| Vault | 8200 | HTTP |
-| Prometheus | 9090 | HTTP |
-| Grafana | 3000 | HTTP |
-| Loki | 3100 | HTTP |
-| Ollama | 11434 | HTTP |
-| LiteLLM | 4000 | HTTP |
-| Qdrant | 6333 | HTTP |
-| SearXNG | 8080 | HTTP |
-| Redis | 6379 | TCP |
-| PostgreSQL | 5432 | TCP |
-| SeaweedFS master | 9000 | HTTP |
-| k3s API | 6443 | HTTPS |
+| Service | Port | Protocol | Notes |
+|---------|------|----------|-------|
+| Traefik (HTTP) | 80 | HTTP | Reverse proxy entry point |
+| Traefik (HTTPS) | 443 | HTTPS | Reverse proxy entry point |
+| GitLab | 8443 | HTTPS | Web UI |
+| Artifactory | 8081 | HTTP | Web UI |
+| SonarQube | 9000 | HTTP | Web UI |
+| Vault | 8200 | HTTP | API & UI |
+| Prometheus | 9090 | HTTP | Metrics & UI |
+| Grafana | 3000 | HTTP | Dashboard UI |
+| Loki | 3100 | HTTP | Log aggregation API |
+| Ollama | 11434 | HTTP | LLM inference API |
+| LiteLLM | 4000 | HTTP | LLM proxy API |
+| Qdrant | 6333 | HTTP | Vector DB API |
+| SearXNG | 8888 | HTTP | Search aggregator UI |
+| Redis | 6379 | TCP | Cache & message broker |
+| PostgreSQL | 5432 | TCP | Database |
+| SeaweedFS master | 9333 | HTTP | Object storage master |
+| SeaweedFS volume | 8080 | HTTP | Object storage volume |
+| k3s API | 6443 | HTTPS | Kubernetes API server |
 
 ---
 
