@@ -80,7 +80,7 @@ if ! command -v ansible-playbook &>/dev/null; then
   export PIPX_HOME=/opt/pipx
   export PIPX_BIN_DIR=/usr/local/bin
   sudo pipx install --include-deps ansible
-  
+  pipx ensurepath
   # Verify installation succeeded
   if ! command -v ansible-playbook &>/dev/null; then
     abort "Ansible installation failed. ansible-playbook not found in PATH."
