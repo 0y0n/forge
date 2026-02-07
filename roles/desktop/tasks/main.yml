@@ -19,19 +19,28 @@
     state:   started
 
 # ── Chrome ───────────────────────────────────────────────────────────────────
+- name: "Check if Google Chrome is already installed"
+  ansible.builtin.command: dpkg-query -W google-chrome-stable
+  register: chrome_check
+  failed_when: false
+  changed_when: false
+  
 - name: "desktop | download Chrome .deb"
   ansible.builtin.get_url:
     url:  "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
     dest: /tmp/chrome.deb
     mode: "0644"
+  when: chrome_check.rc != 0
 
 - name: "desktop | install Chrome .deb"
   ansible.builtin.apt:
     deb: /tmp/chrome.deb
   environment:
     DEBIAN_FRONTEND: noninteractive
+  when: chrome_check.rc != 0
 
 - name: "desktop | cleanup Chrome .deb"
   ansible.builtin.file:
     path: /tmp/chrome.deb
     state: absent
+  when: chrome_check.rc != 0
