@@ -21,4 +21,4 @@ vm_forge_infra:
   gpu_passthrough: false
 
 # ── NVIDIA host driver ───────────────────────────────────────────────────────
-nvidia_driver_branch: "545"         # stable LTS branch for RTX 40-series
+nvidia_driver_branch: "590"         # stable LTS branch for RTX 40-series
