@@ -59,9 +59,17 @@ sudo apt-get update -qq
 info "Upgrading installed packages …"
 DEBIAN_FRONTEND=noninteractive sudo apt-get upgrade -y -qq
 
-# ── 4. Install git ──────────────────────────────────────────────────────
+# ── 4. Install git and ssh──────────────────────────────────────────────────────
 info "Ensuring git is installed …"
-sudo apt-get install -y -qq git
+sudo apt-get install -y -qq git ssh
+
+info "Check for local host as a know key"
+if ! grep -q "127.0.0.1" ~/.ssh/known_hosts 2>/dev/null; then
+    info "Add 127.0.0.1 to known_hosts..."
+    ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts 2>/dev/null
+else
+    info "127.0.0.1 present in known_hosts..."
+fi
 
 # ── 5. Clone Forge repository ────────────────────────────────────────────────
 if [[ -d "$REPO_DIR/.git" ]]; then
