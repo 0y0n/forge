@@ -36,7 +36,11 @@ if dpkg -s ubuntu-desktop >/dev/null 2>&1; then
   abort "This installer targets Ubuntu Server, not a desktop edition."
 fi
 info "OS check passed  →  Ubuntu Server ${VERSION_ID}"
-
+info "Check .bashrc presence in your home"
+if [[ -f "~/.bashrc" ]]; then
+  info "No present copy sekelon from /etc/skel/.bashrc"
+  cp /etc/skel/.bashrc ~/
+fi
 # ── 2. Privilege check ──────────────────────────────────────────────────────
 # This script must NOT be run as root; it uses sudo internally when needed
 if [[ $EUID -eq 0 ]]; then
