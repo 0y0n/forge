@@ -12,11 +12,12 @@
     update_cache: true
 
 - name: "nvidia_host | install recommended driver"
+  become: true
   ansible.builtin.command: ubuntu-drivers autoinstall
   register: nvidia_install
   changed_when: "'install' in nvidia_install.stdout.lower()"
 
 - name: "nvidia_host | reboot if kernel module changed"
-  ansible.builtin.reboot:
+  ansible.builtin.reboot:  # this will fail if ansible is not remotely connected. for local do your reboot manually
     reboot_timeout: 300
   when: nvidia_install.changed

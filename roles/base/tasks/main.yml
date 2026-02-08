@@ -3,25 +3,29 @@
 # Shared baseline: OS validation, apt refresh, git.
 # =============================================================================
 ---
-- name: "base | verify Ubuntu 24.04"
+- name: "base | verify OS System Requirements"
   ansible.builtin.assert:
     that:
-      - ansible_facts['distribution'] == "Ubuntu"
-      - ansible_facts['distribution_version'] == "25.10"
-    fail_msg: "Forge requires Ubuntu Server 25.10. Detected: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+      - ansible_facts['distribution'] == system_requirements.distro
+      - ansible_facts['distribution_version'] == system_requirements.version
+    fail_msg: "Forge requires {{ system_requirements.distro }} {{ system_requirements.version }}. Detected: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
 
 - name: "base | update apt cache"
+  become: true
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600   # re-fetch only if stale > 1 h
+  
 
 - name: "base | upgrade all packages"
+  become: true
   ansible.builtin.apt:
     upgrade: dist
   environment:
     DEBIAN_FRONTEND: noninteractive
 
 - name: "base | install git"
+  become: true
   ansible.builtin.apt:
     name: git
     state: present

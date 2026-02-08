@@ -16,7 +16,6 @@
 - name: "Forge — remote-workstation (physical host)"
   hosts: remote-workstation
   connection: local
-  become: true
   gather_facts: true
 
   roles:
@@ -29,7 +28,6 @@
 # ── second play: delegate into dev-workstation guest ─────────────────────────
 - name: "Forge — dev-workstation (KVM guest)"
   hosts: dev-workstation
-  become: true
   gather_facts: true
 
   roles:
@@ -44,7 +42,6 @@
 # ── third play: delegate into forge-infra guest ─────────────────────────────
 - name: "Forge — forge-infra (KVM guest)"
   hosts: forge-infra
-  become: true
   gather_facts: true
 
   roles:

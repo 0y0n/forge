@@ -5,91 +5,109 @@
 # =============================================================================
 ---
 # ── Visual Studio Code ───────────────────────────────────────────────────────
-- name: "gpg apt dependencies"
+- name: "ide | install keyring support for VS Code secrets"
+  become: true
   ansible.builtin.apt:
-    name: 
-      - wget
-      - gpg
-      - apt-transport-https
+    name:
+      - gnome-keyring
+      - libsecret-1-0
+      - libsecret-common
+      - libsecret-tools
+      - seahorse
+    state: present
+# ── Visual Studio Code ───────────────────────────────────────────────────────
+- name: "ide | prepare apt dependencies"
+  become: true
+  ansible.builtin.apt:
+    name: [wget, gpg, apt-transport-https]
     state: present
     update_cache: true
 
+- name: "ide | prevent vscode from injecting its own repo"
+  become: true
+  ansible.builtin.debconf:
+    name: "code"
+    question: "code/add-microsoft-repo"
+    value: "false"
+    vtype: "boolean"
+
 - name: "ide | add Microsoft GPG key"
-  ansible.builtin.shell: >
-    wget -qO - https://packages.microsoft.com/keys/microsoft.asc |
-    gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
-  args:
+  become: true
+  ansible.builtin.get_url:
+    url: https://packages.microsoft.com/keys/microsoft.asc
+    dest: /usr/share/keyrings/microsoft.asc
+    mode: '0644'
+
+- name: "ide | dearmor GPG key"
+  become: true
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/microsoft.asc
     creates: /usr/share/keyrings/microsoft.gpg
 
-- name: "ide | add VS Code apt repo"
-  ansible.builtin.apt_repository:
-    repo: >
-      deb [signed-by=/usr/share/keyrings/microsoft.gpg arch=amd64]
-      https://packages.microsoft.com/repos/code stable main
+- name: "ide | add VS Code repo (modern DEB822 format)"
+  become: true
+  ansible.builtin.deb822_repository:
+    name: vscode
+    types: [deb]
+    uris: "https://packages.microsoft.com/repos/code"
+    suites: [stable]
+    components: [main]
+    signed_by: /usr/share/keyrings/microsoft.gpg
     state: present
-    filename: vscode
+
+- name: "ide | cleanup legacy vscode list to avoid warnings"
+  become: true
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/vscode.list
+    state: absent
 
 - name: "ide | install VS Code"
+  become: true
   ansible.builtin.apt:
     name: code
     state: present
     update_cache: true
 
 # ── VS Code extensions ───────────────────────────────────────────────────────
+- name: "ide | list installed VS Code extensions"
+  ansible.builtin.command: "code --list-extensions"
+  register: installed_extensions
+  changed_when: false
+  # no failure even if empty
+  failed_when: false
+
 - name: "ide | install VS Code extensions"
   ansible.builtin.command: >
-    code --install-extension {{ item }} --user
+    code --install-extension {{ item }} 
   loop:
     - rust-lang.rust-analyzer
     - ms-python.python
-    - ms-python.pylance
+    - ms-python.vscode-pylance
     - vscjava.vscode-java-pack
-    - ms-vscode.remote-ssh
+    - ms-vscode-remote.remote-ssh
     - ms-vscode-remote.vscode-remote-extensionpack
     - saoudrizwan.claude-dev
-    - bazelbuild.bazel-vs-code
-  environment:
-    HOME: "{{ ansible_facts['env']['HOME'] }}"
-  become: true
-  become_user: "{{ ansible_facts['user_id'] }}"
+    - bazelbuild.vscode-bazel
+  # run only if not in the list previously collected
+  when: item.lower() not in installed_extensions.stdout_lines | map('lower')
 
 # ── JetBrains Community Editions ─────────────────────────────────────────────
-- name: "ide | download & install IntelliJ IDEA Community"
-  ansible.builtin.unarchive:
-    src:  "https://download.jetbrains.com/idea/ideac-2024.1.tar.gz"
-    dest: /opt
-    remote_src: true
-    creates: /opt/idea-community-2024.1
+- name: "ide | install JetBrains dependencies"
+  ansible.builtin.apt:
+    name:
+      - libfuse2          
+      - libnss3           
+      - libxkbcommon-x11-0
+      - libatk-bridge2.0-0
+    state: present
+  become: true
 
-- name: "ide | symlink idea"
-  ansible.builtin.file:
-    path:  /usr/local/bin/idea
-    src:   /opt/idea-community-2024.1/bin/idea.sh
-    state: link
-
-- name: "ide | download & install PyCharm Community"
-  ansible.builtin.unarchive:
-    src:  "https://download.jetbrains.com/python/pycharm-community-2024.1.tar.gz"
-    dest: /opt
-    remote_src: true
-    creates: /opt/pycharm-community-2024.1
-
-- name: "ide | symlink pycharm"
-  ansible.builtin.file:
-    path:  /usr/local/bin/pycharm
-    src:   /opt/pycharm-community-2024.1/bin/pycharm.sh
-    state: link
-
-- name: "ide | download & install RubyMine … (Rust = RustRover Community)"
-  # RustRover is free community edition since 2024
-  ansible.builtin.unarchive:
-    src:  "https://download.jetbrains.com/rustrover/RustRover-2024.1.tar.gz"
-    dest: /opt
-    remote_src: true
-    creates: /opt/RustRover-2024.1
-
-- name: "ide | symlink rustrover"
-  ansible.builtin.file:
-    path:  /usr/local/bin/rustrover
-    src:   /opt/RustRover-2024.1/bin/rustrover.sh
-    state: link
+- name: "ide | provide toolbox download link in a README"
+  ansible.builtin.copy:
+    dest: "~/Desktop/INSTALL_JETBRAINS.txt"
+    content: |
+      To install your JetBrains IDE (to complexe to controlfrom ansible):
+      1. Download Toolbox : https://www.jetbrains.com/toolbox-app/
+      2. ExtrayezExtract and start AppImage.
+      3. Connect with your JetBrains account.
+    mode: '0644'

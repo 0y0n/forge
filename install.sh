@@ -21,6 +21,29 @@ info()  { echo -e "${GREEN}[FORGE]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[FORGE WARN]${NC} $*"; }
 abort() { echo -e "${RED}[FORGE ABORT]${NC} $*" >&2; exit 1; }
 
+# Function to check and set Git config
+check_git_config() {
+    
+    key=$1
+    label=$2
+    current_val=$(git config --global "$key" 2>/dev/null || true)
+    
+    if [ -z "$current_val" ]; then
+        echo -e -n "${YELLOW}Missing configuration:${NC} Enter your $label: "
+        # Use read -r to handle names with spaces properly
+        read -r input
+        
+        if [ -n "$input" ]; then
+            git config --global "$key" "$input"
+            echo -e "${GREEN}✓ $label set successfully.${NC}"
+        else
+            echo -e "⚠️  No input provided. Skipping $label."
+        fi
+    else
+        echo -e "${GREEN}✓ $label is already set:${NC} $current_val"
+    fi
+}
+
 # ── constants ────────────────────────────────────────────────────────────────
 REPO_URL="https://github.com/0y0n/forge.git"
 REPO_DIR="${HOME}/dev/forge"
@@ -62,9 +85,61 @@ sudo apt-get update -qq
 info "Upgrading installed packages …"
 DEBIAN_FRONTEND=noninteractive sudo apt-get upgrade -y -qq
 
-# ── 4. Install git and ssh──────────────────────────────────────────────────────
+info "Install required components if missing"
+REQUIRED_PKGS=("gnome-keyring" "libsecret-tools" "libpam-gnome-keyring")
+for pkg in "${REQUIRED_PKGS[@]}"; do
+    if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+        info "--- Installing $pkg ---"
+        apt-get install -y "$pkg"
+    fi
+done
+
+KEYRING_DIR="$HOME/.local/share/keyrings"
+LOGIN_KEYRING="$KEYRING_DIR/login.keyring"
+
+info "Check if the 'login' keyring already exists"
+if [ ! -f "$LOGIN_KEYRING" ]; then
+    
+    warn "No 'login' keyring detected."
+    
+    # Prompt for the session password
+    # We use -s to prevent the password from being echoed in the terminal
+    read -sp "Enter your session password (used to encrypt the keyring): " USER_PASS
+    echo ""
+
+    # Ensure the directory exists with correct permissions
+    mkdir -p "$KEYRING_DIR"
+    chmod 700 "$KEYRING_DIR"
+
+    # Set 'login' as the default keyring
+    echo "login" > "$KEYRING_DIR/default"
+
+    # Launch the daemon and initialize/unlock the keyring
+    # The --unlock flag creates the keyring if it doesn't exist by reading stdin
+    if echo "$USER_PASS" | gnome-keyring-daemon --unlock --components=secrets --start > /dev/null; then
+        # Validation test using secret-tool
+        if echo "$USER_PASS" | secret-tool store --label="Initialization Task" OS setup 2>/dev/null; then
+            info " 'login' keyring successfully created and unlocked."
+        else
+            abort "  Keyring created, but validation failed. Ensure you are in a valid DBus session."
+        fi
+    else
+        abort "Failed to initialize gnome-keyring-daemon."
+    fi
+    
+    # Clear the password variable for security
+    unset USER_PASS
+else
+    info " 'login' keyring already exists. Skipping initialization."
+fi
+
+# ── 4. Install git ──────────────────────────────────────────────────────
 info "Ensuring git is installed …"
 sudo apt-get install -y -qq git
+
+# Check for Git Name and Email
+check_git_config "user.name" "Git User Name"
+check_git_config "user.email" "Git Email Address"
 
 # ── 5. Clone Forge repository ────────────────────────────────────────────────
 if [[ -d "$REPO_DIR/.git" ]]; then
@@ -100,12 +175,8 @@ info "Starting Ansible playbook for remote-workstation …"
 cd "$REPO_DIR"
 
 if ! ansible-playbook \
-  --ask-become-pass \
-  -i inventory/hosts.yml \
   playbooks/remote_workstation.yml \
-  --connection=local \
-  -e "ansible_become=yes" \
-  -v; then
+  --verbose; then
   abort "Ansible playbook failed. Check the output above for errors."
 fi
 

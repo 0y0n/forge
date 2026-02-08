@@ -10,6 +10,7 @@
 ---
 # ── packages ─────────────────────────────────────────────────────────────────
 - name: "kvm | install virtualisation stack"
+  become: true
   ansible.builtin.apt:
     name:
       - qemu-kvm
@@ -22,7 +23,8 @@
     update_cache: true
 
 - name: "kvm | enable & start libvirtd"
-  ansible.builtin.systemd:
+  become: true
+  ansible.builtin.systemd:  
     name:    libvirtd
     enabled: true
     state:   started

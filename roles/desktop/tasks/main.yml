@@ -5,6 +5,7 @@
 # =============================================================================
 ---
 - name: "desktop | install gnome core (minimal)"
+  become: true
   ansible.builtin.apt:
     name:
       - gdm3
@@ -24,6 +25,7 @@
     DEBIAN_FRONTEND: noninteractive
 
 - name: "desktop | enable gdm3"
+  become: true
   ansible.builtin.systemd:
     name:    gdm3
     enabled: true
@@ -44,6 +46,7 @@
   when: chrome_check.rc != 0
 
 - name: "desktop | install Chrome .deb"
+  become: true
   ansible.builtin.apt:
     deb: /tmp/chrome.deb
   environment:

@@ -22,3 +22,8 @@ vm_forge_infra:
 
 # ── NVIDIA host driver ───────────────────────────────────────────────────────
 nvidia_driver_branch: "590"         # stable LTS branch for RTX 40-series
+
+# operating system version
+system_requirements:
+  distro: "Ubuntu"
+  version: "25.10"

@@ -54,3 +54,8 @@ litellm_version:      "latest"         # pip latest
 
 # Redis
 redis_version:        "7"
+
+# operating system version
+system_requirements:
+  distro: "Ubuntu"
+  version: "25.10"
